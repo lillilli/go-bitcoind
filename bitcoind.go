@@ -8,7 +8,6 @@ import (
 	"strconv"
 )
 
-
 const (
 	// VERSION represents bicoind package version
 	VERSION = 0.1
@@ -24,7 +23,7 @@ type Bitcoind struct {
 // New return a new bitcoind
 func New(host string, port int, user, passwd string, useSSL bool, timeoutParam ...int) (*Bitcoind, error) {
 	var timeout int = RPCCLIENT_TIMEOUT
-	// If the timeout is specified in timeoutParam, allow it. 
+	// If the timeout is specified in timeoutParam, allow it.
 	if len(timeoutParam) != 0 {
 		timeout = timeoutParam[0]
 	}
@@ -167,8 +166,6 @@ func (b *Bitcoind) GetBlockTemplate(capabilities []string, mode string) (templat
 	return
 }
 
-
-
 type ChainTip struct {
 	// The height of the current tip
 	Height int
@@ -301,7 +298,6 @@ func (b *Bitcoind) GetRawMempool() (txId []string, err error) {
 	return
 }
 
-
 type VerboseTx struct {
 	// Virtual transaction size as defined in BIP 141
 	Size uint32
@@ -311,7 +307,7 @@ type VerboseTx struct {
 	ModifiedFee float64
 	// Local time when tx entered pool
 	Time uint32
-	// Block height when tx entered pool 
+	// Block height when tx entered pool
 	Height uint32
 	// Number of inpool descendents (including this one)
 	DescendantCount uint32
@@ -362,6 +358,42 @@ func (b *Bitcoind) GetRawTransaction(txId string, verbose bool) (rawTx interface
 		err = json.Unmarshal(r.Result, &t)
 		rawTx = t
 	}
+	return
+}
+
+// GetRawVerboseTransactions returns raw verbose transactions representation for given transaction ids.
+func (b *Bitcoind) GetRawVerboseTransactions(txIds []string) (rawTxs []interface{}, err error) {
+	intVerbose := 1
+
+	methods := make([]string, len(txIds))
+	params := make([][]interface{}, len(txIds))
+
+	for i, txID := range txIds {
+		methods[i] = "getrawtransaction"
+		params[i] = []interface{}{txID, intVerbose}
+	}
+
+	rs, err := b.client.batch(methods, params)
+	if err != nil {
+		return rawTxs, err
+	}
+
+	rawTxs = make([]interface{}, len(txIds))
+
+	for i, r := range rs {
+		if err = handleError(err, &r); err != nil {
+			return
+		}
+
+		t := new(RawTransaction)
+
+		if err = json.Unmarshal(r.Result, &t); err != nil {
+			return
+		}
+
+		rawTxs[i] = t
+	}
+
 	return
 }
 
@@ -742,4 +774,3 @@ func (b *Bitcoind) WalletPassphraseChange(oldPassphrase, newPassprhase string) e
 	r, err := b.client.call("walletpassphrasechange", []interface{}{oldPassphrase, newPassprhase})
 	return handleError(err, &r)
 }
- 

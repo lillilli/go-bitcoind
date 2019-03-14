@@ -55,7 +55,12 @@ func newClient(host string, port int, user, passwd string, useSSL bool, timeout 
 		httpClient = &http.Client{Transport: t}
 	} else {
 		serverAddr = "http://"
-		httpClient = &http.Client{}
+		httpClient = &http.Client{
+			Transport: &http.Transport{
+				MaxIdleConnsPerHost: 20,
+			},
+			Timeout: 30 * time.Second,
+		}
 	}
 	c = &rpcClient{serverAddr: fmt.Sprintf("%s%s:%d", serverAddr, host, port), user: user, passwd: passwd, httpClient: httpClient, timeout: timeout}
 	return
@@ -110,7 +115,56 @@ func (c *rpcClient) call(method string, params interface{}) (rr rpcResponse, err
 	defer resp.Body.Close()
 
 	data, err := ioutil.ReadAll(resp.Body)
-	//fmt.Println(string(data))
+	if err != nil {
+		return
+	}
+	if resp.StatusCode != 200 {
+		err = errors.New("HTTP error: " + resp.Status)
+		return
+	}
+	err = json.Unmarshal(data, &rr)
+	return
+}
+
+// call prepare & exec the request
+func (c *rpcClient) batch(methods []string, params [][]interface{}) (rr []rpcResponse, err error) {
+	connectTimer := time.NewTimer(time.Duration(c.timeout) * time.Second)
+
+	if len(methods) != len(params) {
+		return rr, errors.New("count of methods are not equal to params")
+	}
+
+	rpcR := make([]rpcRequest, len(methods))
+
+	for i := range methods {
+		rpcR[i] = rpcRequest{methods[i], params[i], time.Now().UnixNano(), "1.0"}
+	}
+
+	payloadBuffer := &bytes.Buffer{}
+	jsonEncoder := json.NewEncoder(payloadBuffer)
+	err = jsonEncoder.Encode(rpcR)
+	if err != nil {
+		return
+	}
+	req, err := http.NewRequest("POST", c.serverAddr, payloadBuffer)
+	if err != nil {
+		return
+	}
+	req.Header.Add("Content-Type", "application/json;charset=utf-8")
+	req.Header.Add("Accept", "application/json")
+
+	// Auth ?
+	if len(c.user) > 0 || len(c.passwd) > 0 {
+		req.SetBasicAuth(c.user, c.passwd)
+	}
+
+	resp, err := c.doTimeoutRequest(connectTimer, req)
+	if err != nil {
+		return
+	}
+	defer resp.Body.Close()
+
+	data, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
 		return
 	}
