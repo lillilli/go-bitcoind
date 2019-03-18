@@ -12,7 +12,7 @@ const (
 	// VERSION represents bicoind package version
 	VERSION = 0.1
 	// DEFAULT_RPCCLIENT_TIMEOUT represent http timeout for rcp client
-	RPCCLIENT_TIMEOUT = 30
+	RPCCLIENT_TIMEOUT = 300
 )
 
 // A Bitcoind represents a Bitcoind client

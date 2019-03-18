@@ -59,7 +59,7 @@ func newClient(host string, port int, user, passwd string, useSSL bool, timeout 
 			Transport: &http.Transport{
 				MaxIdleConnsPerHost: 20,
 			},
-			Timeout: 30 * time.Second,
+			Timeout: 300 * time.Second,
 		}
 	}
 	c = &rpcClient{serverAddr: fmt.Sprintf("%s%s:%d", serverAddr, host, port), user: user, passwd: passwd, httpClient: httpClient, timeout: timeout}
